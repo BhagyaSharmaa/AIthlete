@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-import { Holistic } from "@mediapipe/holistic";
+import { Pose } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
 
 const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasRef }) => {
@@ -12,86 +12,126 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
 
   const [pullupCount, setPullupCount] = useState(0);
   const [isUp, setIsUp] = useState(false);
-  const [prevWristY, setPrevWristY] = useState(null);
+  const [landmarks, setLandmarks] = useState(null);
 
   useEffect(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current) return;
 
-    const holistic = new Holistic({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`,
+    // Initialize the Pose detector from Mediapipe
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
     });
 
-    holistic.setOptions({
+    pose.setOptions({
       modelComplexity: 1,
       smoothLandmarks: true,
       enableSegmentation: false,
-      refineFaceLandmarks: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
     });
 
-    holistic.onResults((results) => {
-      if (!results.poseLandmarks) return;
-
-      const landmarks = results.poseLandmarks;
-      const leftShoulder = landmarks[11];
-      const rightShoulder = landmarks[12];
-      const leftWrist = landmarks[15];
-      const rightWrist = landmarks[16];
-
-      if (!leftShoulder || !rightShoulder || !leftWrist || !rightWrist) return;
-
-      const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-      const wristY = (leftWrist.y + rightWrist.y) / 2;
-
-      if (prevWristY !== null) {
-        const velocity = wristY - prevWristY;
-
-        if (wristY < shoulderY - 0.05 && !isUp && velocity < -0.005) {
-          setIsUp(true);
-        } else if (wristY > shoulderY - 0.02 && isUp && velocity > 0.005) {
-          setIsUp(false);
-          setPullupCount((prev) => prev + 1);
-        }
+    pose.onResults((results) => {
+      if (results.poseLandmarks) {
+        setLandmarks(results.poseLandmarks); // Update landmarks state with the detected landmarks
       }
-
-      setPrevWristY(wristY);
-
-      // 🎨 Fix: Ensure canvas exists before drawing
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "red";
-
-      [leftShoulder, rightShoulder, leftWrist, rightWrist].forEach((point) => {
-        ctx.beginPath();
-        ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
-        ctx.fill();
-      });
+      drawSkeleton(results.poseLandmarks); // Draw skeleton when pose is detected
     });
 
     const camera = new Camera(videoRef.current, {
       onFrame: async () => {
-        await holistic.send({ image: videoRef.current });
+        await pose.send({ image: videoRef.current });
       },
       width: 640,
       height: 480,
     });
 
     camera.start();
+  }, [videoRef]);
 
-    return () => {
-      camera.stop();
-      holistic.close();
-    };
-  }, [videoRef, canvasRef, isUp, prevWristY]);
+  useEffect(() => {
+    if (!landmarks || landmarks.length < 17) return;
+
+    const leftShoulder = landmarks[11];
+    const rightShoulder = landmarks[12];
+    const leftWrist = landmarks[15];
+    const rightWrist = landmarks[16];
+
+    if (!leftShoulder || !rightShoulder || !leftWrist || !rightWrist) return;
+
+    const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+    const wristY = (leftWrist.y + rightWrist.y) / 2;
+    const isAboveBar = wristY < shoulderY - 0.02;
+
+    if (isAboveBar && !isUp) {
+      setIsUp(true);
+    } else if (!isAboveBar && isUp) {
+      setIsUp(false);
+      setPullupCount((prev) => prev + 1);
+    }
+  }, [landmarks, isUp]);
+
+  // Draw skeleton & keypoints on canvas
+  const drawSkeleton = (landmarks) => {
+    if (!canvasRef.current || !landmarks) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
+    ctx.strokeStyle = "cyan";
+    ctx.lineWidth = 3;
+
+    const skeletonPairs = [
+      [11, 13], [13, 15], // Left arm
+      [12, 14], [14, 16], // Right arm
+      [11, 12], // Shoulders
+      [23, 24], // Hips
+      [11, 23], [12, 24], // Torso
+      [23, 25], [25, 27], // Left leg
+      [24, 26], [26, 28], // Right leg
+    ];
+
+    // Draw skeleton lines
+    skeletonPairs.forEach(([startIdx, endIdx]) => {
+      const start = landmarks[startIdx];
+      const end = landmarks[endIdx];
+
+      if (start && end) {
+        ctx.beginPath();
+        ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
+        ctx.lineTo(end.x * canvas.width, end.y * canvas.height);
+        ctx.stroke();
+      }
+    });
+
+    // Draw keypoints (red dots)
+    landmarks.forEach((point) => {
+      if (point) {
+        ctx.beginPath();
+        ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = "red";
+        ctx.fill();
+      }
+    });
+  };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
-      {/* 🎥 Fix: Ensure both video & canvas render properly */}
-      <video ref={videoRef} autoPlay playsInline style={{ position: "absolute", width: "640px", height: "480px", zIndex: 1 }} />
-      <canvas ref={canvasRef} width="640" height="480" style={{ position: "absolute", width: "640px", height: "480px", zIndex: 2, backgroundColor: "transparent" }} />
-      <div style={{ position: "absolute", top: "20px", left: "20px", padding: "10px 20px", backgroundColor: "rgba(0, 0, 0, 0.7)", color: "white", fontSize: "20px", borderRadius: "8px", zIndex: 3, fontWeight: "bold" }}>
+    <div className="relative w-full h-screen flex justify-center items-center bg-black">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="absolute w-[640px] h-[480px] z-1"
+      />
+      <canvas
+        ref={canvasRef}
+        width="640"
+        height="480"
+        className="absolute z-2"
+      />
+      <div className="absolute top-5 left-5 bg-gray-900 text-white p-3 rounded text-lg font-bold">
         Pull-ups: {pullupCount}
       </div>
     </div>

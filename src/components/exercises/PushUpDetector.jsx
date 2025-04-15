@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 
 const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
-  const [pushUpCount] = useState(0);
-  // const [isDown, setIsDown] = useState(false);
+  const [pushUpCount, setPushUpCount] = useState(0);
+  const [isDown, setIsDown] = useState(false);
   const internalVideoRef = useRef(null);
   const internalCanvasRef = useRef(null);
 
@@ -19,9 +19,9 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
           video: { width: 640, height: 480 },
         });
         videoElement.current.srcObject = stream;
-        console.log("Camera started successfully ✅");
+        console.log("Camera started successfully");
       } catch (err) {
-        console.error("❌ Error accessing camera:", err);
+        console.error("Error accessing camera:", err);
       }
     };
 
@@ -30,11 +30,11 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
 
   useEffect(() => {
     if (!landmarks || !videoElement.current || !canvasElement.current) {
-      console.warn("❌ Landmarks, video, or canvas not available.");
+      console.warn("Landmarks, video, or canvas not available.");
       return;
     }
 
-    console.log("✅ Landmarks detected:", landmarks);
+    console.log("Landmarks detected:", landmarks);
 
     const canvas = canvasElement.current;
     const ctx = canvas.getContext("2d");
@@ -42,38 +42,28 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
     // Ensure Canvas Matches Video Size
     canvas.width = videoElement.current.videoWidth || 640;
     canvas.height = videoElement.current.videoHeight || 480;
-    console.log(`🎨 Canvas size set to: ${canvas.width}x${canvas.height}`);
+    console.log(`Canvas size set to: ${canvas.width}x${canvas.height}`);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "red";
     ctx.lineWidth = 3;
 
-    // 🔹 Draw Joints (Keypoints)
+    // Draw Joints (Keypoints)
     landmarks.forEach((point, index) => {
       ctx.beginPath();
       ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
       ctx.fillStyle = "yellow";
       ctx.fill();
-      console.log(`📍 Drawing point ${index} at: x=${point.x}, y=${point.y}`);
+      console.log(`Drawing point ${index} at: x=${point.x}, y=${point.y}`);
     });
 
-    // 🔹 Draw Test Point (Nose) for Debugging
-    const testPoint = landmarks[0]; // Usually nose
-    if (testPoint) {
-      ctx.beginPath();
-      ctx.arc(testPoint.x * canvas.width, testPoint.y * canvas.height, 10, 0, 2 * Math.PI);
-      ctx.fillStyle = "red";
-      ctx.fill();
-      console.log("🎯 Red dot drawn for nose.");
-    }
-
-    // 🔹 Draw Skeleton (Lines)
+    // Draw Skeleton (Lines)
     const connect = (a, b) => {
       ctx.beginPath();
       ctx.moveTo(landmarks[a].x * canvas.width, landmarks[a].y * canvas.height);
       ctx.lineTo(landmarks[b].x * canvas.width, landmarks[b].y * canvas.height);
       ctx.stroke();
-      console.log(`🔗 Connecting ${a} to ${b}`);
+      console.log(`Connecting ${a} to ${b}`);
     };
 
     // Connect Key Points for the Skeleton
@@ -88,7 +78,52 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
       if (landmarks[a] && landmarks[b]) connect(a, b);
     });
 
+    // Push-Up Detection Logic
+    detectPushUps(landmarks);
+
   }, [landmarks]);
+
+  // Calculate angle between three points (shoulder, elbow, and wrist)
+  const calculateAngle = (p1, p2, p3) => {
+    const dx1 = p1.x - p2.x;
+    const dy1 = p1.y - p2.y;
+    const dx2 = p3.x - p2.x;
+    const dy2 = p3.y - p2.y;
+    const angle = Math.atan2(dy2, dx2) - Math.atan2(dy1, dx1);
+    return Math.abs((angle * 180) / Math.PI);
+  };
+
+  // Detect push-up based on elbow angle
+  const detectPushUps = (landmarks) => {
+    if (landmarks.length < 33) return;
+
+    const leftShoulder = landmarks[11];
+    const leftElbow = landmarks[13];
+    const leftWrist = landmarks[15];
+    const rightShoulder = landmarks[12];
+    const rightElbow = landmarks[14];
+    const rightWrist = landmarks[16];
+
+    if (!leftShoulder || !leftElbow || !leftWrist || !rightShoulder || !rightElbow || !rightWrist) return;
+
+    const leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+    const rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+
+    // Define thresholds for elbow angles (this can be adjusted based on needs)
+    const elbowThreshold = 150; // Elbow angle below this means pushing up (top position)
+    const elbowBentThreshold = 90; // Elbow angle below this means bottom position
+
+    // Detect if the user is at the bottom of the push-up
+    if (leftElbowAngle < elbowBentThreshold && rightElbowAngle < elbowBentThreshold && !isDown) {
+      setIsDown(true);
+    }
+
+    // Detect if the user is at the top of the push-up
+    if (leftElbowAngle > elbowThreshold && rightElbowAngle > elbowThreshold && isDown) {
+      setIsDown(false);
+      setPushUpCount((prev) => prev + 1); // Increment push-up count
+    }
+  };
 
   return (
     <div className="relative flex flex-col items-center justify-center w-full h-screen bg-gray-900 text-white">

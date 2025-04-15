@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
+import { Pose } from "@mediapipe/pose";
+import { Camera } from "@mediapipe/camera_utils";
 
 const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: externalCanvasRef }) => {
   const internalVideoRef = useRef(null);
@@ -54,7 +56,7 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
       return;
     }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
     ctx.strokeStyle = "red";
     ctx.lineWidth = 3;
 
@@ -68,6 +70,87 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
         ctx.fill();
       });
   }, [canvasRef, landmarks]);
+
+  // Initialize Pose and Camera
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    const pose = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+    });
+
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: false,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
+    const camera = new Camera(videoRef.current, {
+      onFrame: async () => {
+        await pose.send({ image: videoRef.current });
+      },
+      width: 640,
+      height: 480,
+    });
+
+    camera.start();
+
+    pose.onResults((results) => {
+      if (results.poseLandmarks) {
+        landmarks = results.poseLandmarks; // Update landmarks with Pose detection results
+        drawSkeleton(results.poseLandmarks); // Draw skeleton on canvas
+      }
+    });
+  }, [videoRef]);
+
+  // Draw skeleton & keypoints on canvas
+  const drawSkeleton = (landmarks) => {
+    if (!canvasRef.current || !landmarks) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 3;
+
+    const skeletonPairs = [
+      [11, 13], [13, 15], // Left arm
+      [12, 14], [14, 16], // Right arm
+      [11, 12], // Shoulders
+      [23, 24], // Hips
+      [11, 23], [12, 24], // Torso
+      [23, 25], [25, 27], // Left leg
+      [24, 26], [26, 28], // Right leg
+    ];
+
+    // Draw skeleton lines
+    skeletonPairs.forEach(([startIdx, endIdx]) => {
+      const start = landmarks[startIdx];
+      const end = landmarks[endIdx];
+
+      if (start && end) {
+        ctx.beginPath();
+        ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
+        ctx.lineTo(end.x * canvas.width, end.y * canvas.height);
+        ctx.stroke();
+      }
+    });
+
+    // Draw keypoints (red dots)
+    landmarks.forEach((point) => {
+      if (point) {
+        ctx.beginPath();
+        ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = "red";
+        ctx.fill();
+      }
+    });
+  };
 
   return (
     <div
@@ -127,7 +210,7 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
 };
 
 LungesDetector.propTypes = {
-  landmarks: PropTypes.array,
+  landmarks: PropTypes.array.isRequired,
   videoRef: PropTypes.object,
   canvasRef: PropTypes.object,
 };
