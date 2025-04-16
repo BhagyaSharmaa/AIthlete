@@ -9,7 +9,7 @@ const Home = () => {
             <p className="text-lg text-white mb-6">Click on the button below to take a look at the exercises</p>
 
             <SignedIn>
-                <Link to="/dashboard" className="px-4 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-700">
+                <Link to="/dashboard" className="px-4 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-">
                     Go to Exercises Dashboard
                 </Link>
             </SignedIn>
