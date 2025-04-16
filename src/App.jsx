@@ -57,14 +57,14 @@ function App() {
         </div>
 
         {/* Navigation Bar */}
-        <nav className="flex justify-between p-4 bg-gray-800 text-white relative z-10">
-          <h1 className="text-5xl font-bold">Flex It Out</h1>
+        <nav className="flex justify-between p-4 bg-red-900 text-white relative z-10">
+          <h1 className="text-5xl font-bold">AIthlete</h1>
           <div>
             <SignedIn>
               <UserButton />
             </SignedIn>
             <SignedOut>
-              <a href="/sign-in" className="mr-4 px-4 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition">
+              <a href="/sign-in" className="mr-4 px-4 py-2 bg-amber-400 rounded-lg text-white hover:bg-blue-500 transition">
                 Login
               </a>
               <a href="/sign-up" className="px-4 py-2 bg-green-600 rounded-lg text-white hover:bg-green-500 transition">
