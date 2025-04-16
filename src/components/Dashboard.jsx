@@ -82,6 +82,16 @@ const Dashboard = () => {
                     </ul>
                 </div>
             </div>
+
+            {/* Go to Home Button */}
+            <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2">
+                <Link
+                    to="/home"
+                    className="px-6 py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-600 transition duration-300"
+                >
+                    Go to Home
+                </Link>
+            </div>
         </div>
     );
 };
