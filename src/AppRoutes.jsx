@@ -4,6 +4,7 @@ import { SignedIn, SignedOut, RedirectToSignIn, SignIn, SignUp, Navigate, UserBu
 
 import Home from "./components/Home";
 import Dashboard from "./components/Dashboard";
+import WorkoutPlanDetail from "./components/PlanDetails";
 import WorkoutDetail from "./components/WorkoutDetail";
 import Squats from "./components/exercises/SquatDetector";
 import PushUps from "./components/exercises/PushUpDetector";
@@ -75,6 +76,7 @@ const AppRoutes = () => {
             }
           />
           <Route path="/home" element={<Home />} />
+          <Route path="/workout-plans/:id" element={<WorkoutPlanDetail />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/workout/:workoutName" element={<WorkoutDetail />} />
           <Route path="/start-workout/:workoutName" element={<StartWorkout />} />
