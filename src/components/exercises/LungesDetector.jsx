@@ -12,6 +12,9 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
 
   const [lungeCount, setLungeCount] = useState(0);
   const [isLunging, setIsLunging] = useState(false);
+  const [isCameraStarted, setIsCameraStarted] = useState(false);
+  const [timer, setTimer] = useState(0); // Track elapsed time
+  const [isTimerRunning, setIsTimerRunning] = useState(false); // Timer state (running or paused)
 
   useEffect(() => {
     if (!landmarks || landmarks.length < 29) {
@@ -73,7 +76,7 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
 
   // Initialize Pose and Camera
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || isCameraStarted) return;
 
     const pose = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
@@ -103,7 +106,9 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
         drawSkeleton(results.poseLandmarks); // Draw skeleton on canvas
       }
     });
-  }, [videoRef]);
+
+    setIsCameraStarted(true); // Camera started successfully
+  }, [videoRef, isCameraStarted]);
 
   // Draw skeleton & keypoints on canvas
   const drawSkeleton = (landmarks) => {
@@ -150,6 +155,39 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
         ctx.fill();
       }
     });
+  };
+
+  const resetLungeCount = () => {
+    setLungeCount(0);
+  };
+
+  const toggleCamera = () => {
+    if (isCameraStarted) {
+      setIsCameraStarted(false);
+    } else {
+      setIsCameraStarted(true);
+    }
+  };
+
+  const startTimer = () => {
+    if (!isTimerRunning) {
+      setIsTimerRunning(true);
+      const interval = setInterval(() => {
+        if (isTimerRunning) {
+          setTimer((prevTimer) => prevTimer + 1);
+        }
+      }, 1000);
+      return interval;
+    }
+  };
+
+  const stopTimer = () => {
+    setIsTimerRunning(false);
+  };
+
+  const resetTimer = () => {
+    setTimer(0);
+    setIsTimerRunning(false);
   };
 
   return (
@@ -204,6 +242,91 @@ const LungesDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef: exte
         }}
       >
         <h2>Lunges: {lungeCount}</h2>
+        <h2>Time: {timer}s</h2>
+      </div>
+
+      {/* Buttons */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 4,
+          display: "flex",
+          gap: "15px",
+        }}
+      >
+        <button
+          onClick={resetLungeCount}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "red",
+            color: "white",
+            fontSize: "16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            border: "none",
+          }}
+        >
+          Reset Count
+        </button>
+        <button
+          onClick={toggleCamera}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "blue",
+            color: "white",
+            fontSize: "16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            border: "none",
+          }}
+        >
+          {isCameraStarted ? "Stop Camera" : "Start Camera"}
+        </button>
+        <button
+          onClick={startTimer}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "green",
+            color: "white",
+            fontSize: "16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            border: "none",
+          }}
+        >
+          Start Timer
+        </button>
+        <button
+          onClick={stopTimer}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "yellow",
+            color: "black",
+            fontSize: "16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            border: "none",
+          }}
+        >
+          Stop Timer
+        </button>
+        <button
+          onClick={resetTimer}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "orange",
+            color: "white",
+            fontSize: "16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            border: "none",
+          }}
+        >
+          Reset Timer
+        </button>
       </div>
     </div>
   );

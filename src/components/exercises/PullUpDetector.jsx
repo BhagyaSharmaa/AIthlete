@@ -6,6 +6,7 @@ import { Camera } from "@mediapipe/camera_utils";
 const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasRef }) => {
   const internalVideoRef = useRef(null);
   const internalCanvasRef = useRef(null);
+  const cameraRef = useRef(null);
 
   const videoRef = externalVideoRef ?? internalVideoRef;
   const canvasRef = externalCanvasRef ?? internalCanvasRef;
@@ -13,11 +14,12 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
   const [pullupCount, setPullupCount] = useState(0);
   const [isUp, setIsUp] = useState(false);
   const [landmarks, setLandmarks] = useState(null);
+  const [isWorkoutActive, setIsWorkoutActive] = useState(false);
+  const [showSavedMessage, setShowSavedMessage] = useState(false);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    if (!isWorkoutActive || !videoRef.current) return;
 
-    // Initialize the Pose detector from Mediapipe
     const pose = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
     });
@@ -32,9 +34,9 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
 
     pose.onResults((results) => {
       if (results.poseLandmarks) {
-        setLandmarks(results.poseLandmarks); // Update landmarks state with the detected landmarks
+        setLandmarks(results.poseLandmarks);
       }
-      drawSkeleton(results.poseLandmarks); // Draw skeleton when pose is detected
+      drawSkeleton(results.poseLandmarks);
     });
 
     const camera = new Camera(videoRef.current, {
@@ -46,7 +48,12 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
     });
 
     camera.start();
-  }, [videoRef]);
+    cameraRef.current = camera;
+
+    return () => {
+      camera.stop();
+    };
+  }, [isWorkoutActive]);
 
   useEffect(() => {
     if (!landmarks || landmarks.length < 17) return;
@@ -70,34 +77,26 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
     }
   }, [landmarks, isUp]);
 
-  // Draw skeleton & keypoints on canvas
   const drawSkeleton = (landmarks) => {
     if (!canvasRef.current || !landmarks) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "cyan";
     ctx.lineWidth = 3;
 
     const skeletonPairs = [
-      [11, 13], [13, 15], // Left arm
-      [12, 14], [14, 16], // Right arm
-      [11, 12], // Shoulders
-      [23, 24], // Hips
-      [11, 23], [12, 24], // Torso
-      [23, 25], [25, 27], // Left leg
-      [24, 26], [26, 28], // Right leg
+      [11, 13], [13, 15], [12, 14], [14, 16],
+      [11, 12], [23, 24], [11, 23], [12, 24],
+      [23, 25], [25, 27], [24, 26], [26, 28],
     ];
 
-    // Draw skeleton lines
     skeletonPairs.forEach(([startIdx, endIdx]) => {
       const start = landmarks[startIdx];
       const end = landmarks[endIdx];
-
       if (start && end) {
         ctx.beginPath();
         ctx.moveTo(start.x * canvas.width, start.y * canvas.height);
@@ -106,7 +105,6 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
       }
     });
 
-    // Draw keypoints (red dots)
     landmarks.forEach((point) => {
       if (point) {
         ctx.beginPath();
@@ -115,6 +113,36 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
         ctx.fill();
       }
     });
+  };
+
+  const handleStart = () => {
+    setIsWorkoutActive(true);
+    setShowSavedMessage(false);
+  };
+
+  const handleStop = () => {
+    setIsWorkoutActive(false);
+    if (cameraRef.current) {
+      cameraRef.current.stop();
+    }
+
+    // Save to localStorage
+    const previousReps = JSON.parse(localStorage.getItem("pullupReps")) || [];
+    const updatedReps = [
+      ...previousReps,
+      {
+        timestamp: new Date().toISOString(),
+        reps: pullupCount,
+      },
+    ];
+    localStorage.setItem("pullupReps", JSON.stringify(updatedReps));
+    setShowSavedMessage(true);
+  };
+
+  const handleReset = () => {
+    setPullupCount(0);
+    setIsUp(false);
+    setShowSavedMessage(false);
   };
 
   return (
@@ -134,6 +162,33 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
       <div className="absolute top-5 left-5 bg-gray-900 text-white p-3 rounded text-lg font-bold">
         Pull-ups: {pullupCount}
       </div>
+
+      <div className="absolute bottom-10 left-5 flex gap-4">
+        <button
+          onClick={handleStart}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+        >
+          Start Workout
+        </button>
+        <button
+          onClick={handleStop}
+          className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded"
+        >
+          Stop Workout
+        </button>
+        <button
+          onClick={handleReset}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+        >
+          Reset Reps
+        </button>
+      </div>
+
+      {showSavedMessage && (
+        <div className="absolute bottom-5 right-5 bg-green-800 text-white px-4 py-2 rounded text-sm">
+          Workout saved!
+        </div>
+      )}
     </div>
   );
 };

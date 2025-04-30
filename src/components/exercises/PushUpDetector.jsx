@@ -4,86 +4,90 @@ import PropTypes from "prop-types";
 const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
   const [pushUpCount, setPushUpCount] = useState(0);
   const [isDown, setIsDown] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
+
   const internalVideoRef = useRef(null);
   const internalCanvasRef = useRef(null);
+  const streamRef = useRef(null); // Store camera stream for stopping later
 
   const videoElement = videoRef || internalVideoRef;
   const canvasElement = canvasRef || internalCanvasRef;
 
+  const startCamera = async () => {
+    if (!videoElement.current) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 },
+      });
+      streamRef.current = stream;
+      videoElement.current.srcObject = stream;
+      setCameraStarted(true);
+      console.log("Camera started successfully");
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      videoElement.current.srcObject = null;
+      setCameraStarted(false);
+      console.log("Camera stopped");
+    }
+  };
+
+  const resetCounter = () => {
+    setPushUpCount(0);
+    setIsDown(false);
+  };
+
   useEffect(() => {
-    const startCamera = async () => {
-      if (!videoElement.current) return;
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 },
-        });
-        videoElement.current.srcObject = stream;
-        console.log("Camera started successfully");
-      } catch (err) {
-        console.error("Error accessing camera:", err);
-      }
-    };
-
     startCamera();
+    return stopCamera;
   }, []);
 
   useEffect(() => {
-    if (!landmarks || !videoElement.current || !canvasElement.current) {
-      console.warn("Landmarks, video, or canvas not available.");
-      return;
-    }
-
-    console.log("Landmarks detected:", landmarks);
+    if (!landmarks || !videoElement.current || !canvasElement.current) return;
 
     const canvas = canvasElement.current;
     const ctx = canvas.getContext("2d");
 
-    // Ensure Canvas Matches Video Size
     canvas.width = videoElement.current.videoWidth || 640;
     canvas.height = videoElement.current.videoHeight || 480;
-    console.log(`Canvas size set to: ${canvas.width}x${canvas.height}`);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = "red";
     ctx.lineWidth = 3;
 
-    // Draw Joints (Keypoints)
-    landmarks.forEach((point, index) => {
+    landmarks.forEach((point) => {
       ctx.beginPath();
       ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
       ctx.fillStyle = "yellow";
       ctx.fill();
-      console.log(`Drawing point ${index} at: x=${point.x}, y=${point.y}`);
     });
 
-    // Draw Skeleton (Lines)
     const connect = (a, b) => {
       ctx.beginPath();
       ctx.moveTo(landmarks[a].x * canvas.width, landmarks[a].y * canvas.height);
       ctx.lineTo(landmarks[b].x * canvas.width, landmarks[b].y * canvas.height);
       ctx.stroke();
-      console.log(`Connecting ${a} to ${b}`);
     };
 
-    // Connect Key Points for the Skeleton
     const connections = [
-      [11, 13], [13, 15], // Left Arm
-      [12, 14], [14, 16], // Right Arm
-      [11, 12], [11, 23], [12, 24], // Shoulders to torso
-      [23, 25], [25, 27], [24, 26], [26, 28] // Legs
+      [11, 13], [13, 15], [12, 14], [14, 16],
+      [11, 12], [11, 23], [12, 24],
+      [23, 25], [25, 27], [24, 26], [26, 28],
     ];
-    
+
     connections.forEach(([a, b]) => {
       if (landmarks[a] && landmarks[b]) connect(a, b);
     });
 
-    // Push-Up Detection Logic
     detectPushUps(landmarks);
-
   }, [landmarks]);
 
-  // Calculate angle between three points (shoulder, elbow, and wrist)
   const calculateAngle = (p1, p2, p3) => {
     const dx1 = p1.x - p2.x;
     const dy1 = p1.y - p2.y;
@@ -93,35 +97,31 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
     return Math.abs((angle * 180) / Math.PI);
   };
 
-  // Detect push-up based on elbow angle
   const detectPushUps = (landmarks) => {
     if (landmarks.length < 33) return;
 
-    const leftShoulder = landmarks[11];
-    const leftElbow = landmarks[13];
-    const leftWrist = landmarks[15];
-    const rightShoulder = landmarks[12];
-    const rightElbow = landmarks[14];
-    const rightWrist = landmarks[16];
+    const [lS, lE, lW] = [landmarks[11], landmarks[13], landmarks[15]];
+    const [rS, rE, rW] = [landmarks[12], landmarks[14], landmarks[16]];
 
-    if (!leftShoulder || !leftElbow || !leftWrist || !rightShoulder || !rightElbow || !rightWrist) return;
+    const leftAngle = calculateAngle(lS, lE, lW);
+    const rightAngle = calculateAngle(rS, rE, rW);
 
-    const leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-    const rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+    const elbowThreshold = 150;
+    const elbowBentThreshold = 90;
 
-    // Define thresholds for elbow angles (this can be adjusted based on needs)
-    const elbowThreshold = 150; // Elbow angle below this means pushing up (top position)
-    const elbowBentThreshold = 90; // Elbow angle below this means bottom position
-
-    // Detect if the user is at the bottom of the push-up
-    if (leftElbowAngle < elbowBentThreshold && rightElbowAngle < elbowBentThreshold && !isDown) {
+    if (leftAngle < elbowBentThreshold && rightAngle < elbowBentThreshold && !isDown) {
       setIsDown(true);
     }
 
-    // Detect if the user is at the top of the push-up
-    if (leftElbowAngle > elbowThreshold && rightElbowAngle > elbowThreshold && isDown) {
+    if (leftAngle > elbowThreshold && rightAngle > elbowThreshold && isDown) {
       setIsDown(false);
-      setPushUpCount((prev) => prev + 1); // Increment push-up count
+      setPushUpCount((prev) => prev + 1);
+
+      // Save the count and timestamp to localStorage when a push-up is completed
+      const timestamp = new Date().toISOString();
+      const workoutData = JSON.parse(localStorage.getItem("pushUpWorkoutData")) || [];
+      workoutData.push({ count: pushUpCount + 1, timestamp });
+      localStorage.setItem("pushUpWorkoutData", JSON.stringify(workoutData));
     }
   };
 
@@ -136,6 +136,31 @@ const PushUpDetector = ({ landmarks, videoRef, canvasRef }) => {
 
       <div className="absolute top-5 right-5 bg-black/70 px-6 py-3 rounded-lg text-xl font-semibold shadow-md">
         Push-ups: {pushUpCount}
+      </div>
+
+      <div className="mt-6 flex gap-4">
+        {!cameraStarted && (
+          <button
+            onClick={startCamera}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold"
+          >
+            Start Camera
+          </button>
+        )}
+        {cameraStarted && (
+          <button
+            onClick={stopCamera}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-semibold"
+          >
+            Stop Camera
+          </button>
+        )}
+        <button
+          onClick={resetCounter}
+          className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg font-semibold text-black"
+        >
+          Reset Counter
+        </button>
       </div>
     </div>
   );

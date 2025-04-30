@@ -10,10 +10,11 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
 
   const [jumpCount, setJumpCount] = useState(0);
   const [isJumping, setIsJumping] = useState(false);
+  const [isDetectionActive, setIsDetectionActive] = useState(true);
 
   useEffect(() => {
-    if (!landmarks || landmarks.length < 29) {
-      console.warn("Invalid or insufficient landmarks data.");
+    if (!landmarks || landmarks.length < 29 || !isDetectionActive) {
+      console.warn("Invalid or insufficient landmarks data or detection is inactive.");
       return;
     }
 
@@ -27,11 +28,9 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
       return;
     }
 
-    // Average Y position of ankles and wrists
     const ankleY = (leftAnkle.y + rightAnkle.y) / 2;
     const wristY = (leftWrist.y + rightWrist.y) / 2;
 
-    // Conditions for a jumping jack motion
     const legsApart = Math.abs(leftAnkle.x - rightAnkle.x) > 0.1;
     const handsAboveHead = wristY < ankleY - 0.1;
 
@@ -43,7 +42,7 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
         setJumpCount((prev) => prev + 1);
       }
     }
-  }, [landmarks, isJumping]);
+  }, [landmarks, isJumping, isDetectionActive]);
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -73,6 +72,10 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
     });
   }, [canvasRef, landmarks]);
 
+  const handleStartStopDetection = () => {
+    setIsDetectionActive((prev) => !prev);
+  };
+
   return (
     <div
       style={{
@@ -82,8 +85,10 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        flexDirection: "column",
       }}
     >
+      {/* Video Element */}
       <video
         ref={videoRef}
         autoPlay
@@ -96,6 +101,7 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
         }}
       />
 
+      {/* Canvas for Pose Skeleton */}
       <canvas
         ref={canvasRef}
         width="640"
@@ -108,6 +114,7 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
         }}
       />
 
+      {/* Jumping Jacks Counter Overlay */}
       <div
         style={{
           position: "absolute",
@@ -122,6 +129,34 @@ const JumpingJacksDetector = ({ landmarks, videoRef: externalVideoRef, canvasRef
         }}
       >
         <h2>Jumping Jacks: {jumpCount}</h2>
+      </div>
+
+      {/* Buttons to Start/Stop Detection */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 4,
+          display: "flex",
+          gap: "20px",
+        }}
+      >
+        <button
+          onClick={handleStartStopDetection}
+          style={{
+            padding: "10px 20px",
+            fontSize: "16px",
+            backgroundColor: isDetectionActive ? "red" : "green",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          {isDetectionActive ? "Stop Detection" : "Start Detection"}
+        </button>
       </div>
     </div>
   );
