@@ -43,7 +43,7 @@ const Home = () => {
 
             {/* Workout Plans Section */}
             <div>
-                <h2 className="text-3xl font-semibold text-white mb-4">Workout Plans</h2>
+                <h2 className="text-3xl font-semibold text-white mb-4">Workout Plans (Currently in Development)</h2>
                 {loading ? (
                     <p className="text-white">Loading...</p>
                 ) : workoutPlans.length === 0 ? (
