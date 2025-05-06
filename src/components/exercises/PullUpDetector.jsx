@@ -126,17 +126,41 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
       cameraRef.current.stop();
     }
 
-    // Save to localStorage
     const previousReps = JSON.parse(localStorage.getItem("pullupReps")) || [];
-    const updatedReps = [
-      ...previousReps,
-      {
-        timestamp: new Date().toISOString(),
-        reps: pullupCount,
-      },
-    ];
+    const newEntry = {
+      timestamp: new Date().toISOString(),
+      reps: pullupCount,
+    };
+    const updatedReps = [...previousReps, newEntry];
     localStorage.setItem("pullupReps", JSON.stringify(updatedReps));
     setShowSavedMessage(true);
+
+    // 🔥 Sync to backend
+    const syncToBackend = async () => {
+      const payload = {
+        userId: "demoUser123", // TEMP: Replace with actual userId when auth is ready
+        pullupReps: updatedReps,
+      };
+
+      try {
+        const response = await fetch("http://localhost:5000/api/save-history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error("Failed to sync to backend");
+
+        const result = await response.json();
+        console.log("✅ Synced to backend:", result);
+      } catch (error) {
+        console.error("❌ Backend sync error:", error.message);
+      }
+    };
+
+    syncToBackend();
   };
 
   const handleReset = () => {
