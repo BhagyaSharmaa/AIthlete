@@ -3,7 +3,11 @@ import PropTypes from "prop-types";
 import { Pose } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
 
-const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasRef }) => {
+const PullupDetector = ({
+  videoRef: externalVideoRef,
+  canvasRef: externalCanvasRef,
+  workoutName = "Pull-up", // ✅ Default to "Pull-up" if not provided
+}) => {
   const internalVideoRef = useRef(null);
   const internalCanvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -21,7 +25,8 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
     if (!isWorkoutActive || !videoRef.current) return;
 
     const pose = new Pose({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
     });
 
     pose.setOptions({
@@ -129,6 +134,7 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
     const previousReps = JSON.parse(localStorage.getItem("pullupReps")) || [];
     const newEntry = {
       timestamp: new Date().toISOString(),
+      workout: workoutName, // ✅ Store workout name
       reps: pullupCount,
     };
     const updatedReps = [...previousReps, newEntry];
@@ -184,7 +190,7 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
         className="absolute z-2"
       />
       <div className="absolute top-5 left-5 bg-gray-900 text-white p-3 rounded text-lg font-bold">
-        Pull-ups: {pullupCount}
+        {workoutName} Reps: {pullupCount}
       </div>
 
       <div className="absolute bottom-10 left-5 flex gap-4">
@@ -220,6 +226,7 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
 PullupDetector.propTypes = {
   videoRef: PropTypes.object,
   canvasRef: PropTypes.object,
+  workoutName: PropTypes.string, // ✅ Added prop type
 };
 
 export default PullupDetector;
