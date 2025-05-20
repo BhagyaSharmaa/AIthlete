@@ -12,33 +12,40 @@ const workouts = [
 
 const Dashboard = () => {
     const [leaderboard, setLeaderboard] = useState([]);
+    const [pullupReps, setPullupReps] = useState([]);
 
     useEffect(() => {
-        const fetchLeaderboard = async () => {
+        const stored = localStorage.getItem("leaderboard");
+        if (stored) {
             try {
-                // ⚠️ No backend, so using mock data
-                const mockData = [
-                    { id: 1, name: "Alice", score: 100 },
-                    { id: 2, name: "Bob", score: 95 },
-                    { id: 3, name: "Charlie", score: 90 }
-                ];
-
-                console.warn("⚠️ No backend available. Using mock leaderboard data.");
-                setLeaderboard(mockData);
-            } catch (error) {
-                console.error("Error fetching leaderboard:", error);
+                setLeaderboard(JSON.parse(stored));
+            } catch (err) {
+                console.error("Failed to parse leaderboard from localStorage:", err);
             }
-        };
+        }
 
-        fetchLeaderboard();
+        const reps = localStorage.getItem("pullupReps");
+        if (reps) {
+            try {
+                const parsedReps = JSON.parse(reps);
+                // Map the data to include workout name if it exists
+                const updatedReps = parsedReps.map(entry => {
+                    if (!entry.workout) {
+                        entry.workout = 'Unknown'; // Default to 'Unknown' if no workout name exists
+                    }
+                    return entry;
+                });
+                setPullupReps(updatedReps);
+            } catch (err) {
+                console.error("Failed to parse pullupReps from localStorage:", err);
+            }
+        }
     }, []);
 
     return (
-        <div className="relative flex flex-col md:flex-row justify-between items-center min-h-screen gap-10 px-6">
-            {/* Background Overlay */}
+        <div className="relative flex flex-col md:flex-row justify-between items-start min-h-screen gap-10 px-6 pt-10">
             <div className="absolute inset-0 bg-black/50 z-0"></div>
 
-            {/* Workout Section */}
             <div className="relative z-10 flex flex-col items-center md:flex-1">
                 <h1 className="text-6xl font-extrabold text-white mb-6 text-center drop-shadow-lg">
                     Dashboard
@@ -61,7 +68,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Leaderboard Section */}
+            {/* Leaderboard */}
             <div className="relative z-10 flex flex-col items-center w-full max-w-sm md:w-1/4">
                 <h2 className="text-3xl font-bold text-white text-center mb-4 drop-shadow-lg">
                     Leaderboard 🏆
@@ -70,10 +77,10 @@ const Dashboard = () => {
                     rounded-xl p-6 w-full">
                     <ul className="text-white">
                         {leaderboard.length === 0 ? (
-                            <p className="text-center text-lg">Loading...</p>
+                            <p className="text-center text-lg">(In development)</p>
                         ) : (
                             leaderboard.map((user, index) => (
-                                <li key={user.id} className="flex justify-between py-2 px-4 bg-white/10 rounded-lg mb-2">
+                                <li key={index} className="flex justify-between py-2 px-4 bg-white/10 rounded-lg mb-2">
                                     <span className="font-semibold">{index + 1}. {user.name}</span>
                                     <span className="font-bold">{user.score}</span>
                                 </li>
@@ -83,7 +90,29 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Go to Home Button */}
+            {/* Pull-up Reps */}
+            <div className="relative z-10 flex flex-col items-center w-full max-w-sm md:w-1/4">
+                <h2 className="text-3xl font-bold text-white text-center mb-4 drop-shadow-lg">
+                    Recent Activities 📈
+                </h2>
+                <div className="bg-white/20 backdrop-blur-md shadow-lg border border-white/30 
+                    rounded-xl p-6 w-full max-h-96 overflow-y-auto">
+                    {pullupReps.length === 0 ? (
+                        <p className="text-center text-lg text-white">No pull-up data available.</p>
+                    ) : (
+                        <ul className="text-white">
+                            {pullupReps.map((entry, index) => (
+                                <li key={index} className="flex justify-between py-2 px-4 bg-white/10 rounded-lg mb-2">
+                                    <span className="font-semibold">{new Date(entry.timestamp).toLocaleString()}</span>
+                                    <span className="font-bold">{entry.reps} reps</span>
+                                    <span className="text-sm font-medium pl-3 pr-4">{entry.workout}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+
             <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2">
                 <Link
                     to="/home"

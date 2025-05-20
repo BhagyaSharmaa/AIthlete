@@ -3,7 +3,11 @@ import PropTypes from "prop-types";
 import { Pose } from "@mediapipe/pose";
 import { Camera } from "@mediapipe/camera_utils";
 
-const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasRef }) => {
+const PullupDetector = ({
+  videoRef: externalVideoRef,
+  canvasRef: externalCanvasRef,
+  workoutName = "Pull-up", // ✅ Default to "Pull-up" if not provided
+}) => {
   const internalVideoRef = useRef(null);
   const internalCanvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -21,7 +25,8 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
     if (!isWorkoutActive || !videoRef.current) return;
 
     const pose = new Pose({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
     });
 
     pose.setOptions({
@@ -126,17 +131,42 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
       cameraRef.current.stop();
     }
 
-    // Save to localStorage
     const previousReps = JSON.parse(localStorage.getItem("pullupReps")) || [];
-    const updatedReps = [
-      ...previousReps,
-      {
-        timestamp: new Date().toISOString(),
-        reps: pullupCount,
-      },
-    ];
+    const newEntry = {
+      timestamp: new Date().toISOString(),
+      workout: workoutName, // ✅ Store workout name
+      reps: pullupCount,
+    };
+    const updatedReps = [...previousReps, newEntry];
     localStorage.setItem("pullupReps", JSON.stringify(updatedReps));
     setShowSavedMessage(true);
+
+    // 🔥 Sync to backend
+    const syncToBackend = async () => {
+      const payload = {
+        userId: "demoUser123", // TEMP: Replace with actual userId when auth is ready
+        pullupReps: updatedReps,
+      };
+
+      try {
+        const response = await fetch("http://localhost:5000/api/save-history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error("Failed to sync to backend");
+
+        const result = await response.json();
+        console.log("✅ Synced to backend:", result);
+      } catch (error) {
+        console.error("❌ Backend sync error:", error.message);
+      }
+    };
+
+    syncToBackend();
   };
 
   const handleReset = () => {
@@ -160,7 +190,7 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
         className="absolute z-2"
       />
       <div className="absolute top-5 left-5 bg-gray-900 text-white p-3 rounded text-lg font-bold">
-        Pull-ups: {pullupCount}
+        {workoutName} Reps: {pullupCount}
       </div>
 
       <div className="absolute bottom-10 left-5 flex gap-4">
@@ -196,6 +226,7 @@ const PullupDetector = ({ videoRef: externalVideoRef, canvasRef: externalCanvasR
 PullupDetector.propTypes = {
   videoRef: PropTypes.object,
   canvasRef: PropTypes.object,
+  workoutName: PropTypes.string, // ✅ Added prop type
 };
 
 export default PullupDetector;

@@ -62,12 +62,12 @@ const Home = () => {
                                     ))}
                                 </ul>
                                 {/* Generate a URL-safe version of the title for the link */}
-                                <Link
+                                {/* <Link
                                     to={`/workout/${encodeURIComponent(plan.title.toLowerCase().replace(/\s+/g, '-'))}`}
                                     className="block mt-4 text-center text-white bg-red-500 rounded-lg py-2"
                                 >
                                     View Plan
-                                </Link>
+                                </Link> */}
                             </div>
                         ))}
                     </div>
