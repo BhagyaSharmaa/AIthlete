@@ -1,16 +1,29 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const WorkoutPlan = require("../models/WorkOutPlan");
+const WorkoutPlan = require('../models/WorkoutPlan'); // Import the WorkoutPlan model
 
+// Route to fetch workout plans
 
 router.get("/", async (req, res) => {
     try {
-        const plans = await WorkoutPlan.find();
-        res.json(plans);
-    } catch (err) {
+        console.log("[INFO] Fetching workout plans...");
+
+        const workoutPlans = await WorkoutPlan.find(); // Query to get all workout plans
+        if (!workoutPlans || workoutPlans.length === 0) {
+            console.log("[INFO] No workout plans found.");
+            return res.status(404).json({ error: "No workout plans found" });
+        }
+
+        console.log(`[INFO] ${workoutPlans.length} workout plans fetched.`);
+        res.status(200).json(workoutPlans); // Respond with the workout plans
+    } catch (error) {
+        console.error("[ERROR] Failed to fetch workout plans:", error);
         res.status(500).json({ error: "Failed to fetch workout plans" });
     }
 });
+
+module.exports = router;
+
 
 
 router.post("/", async (req, res) => {

@@ -13,5 +13,5 @@ const workoutPlanSchema = new mongoose.Schema({
 });
 
 const WorkoutPlan = mongoose.model("WorkoutPlan", workoutPlanSchema);
-module.exports = WorkoutPlan;
 
+module.exports = WorkoutPlan;
